@@ -1,0 +1,10 @@
+The file reading needs to be store as a buffer for mark and reset to work.
+
+The carving part is a class that will spawn a child thread whenever it finds a jpeg -> it then sets a value as false to let it know it is
+searching for a ffd9 for the ending of a file -> when the ending is found, it switches to true and now searches for a header
+
+This should be running in N since all threads are using a single for loop
+
+The threads should be spawned and stored inside of an array (size 20?)
+The threads do not need to be syncronized since they output to a file
+File name increments by 1 (use variable i for file name?)
