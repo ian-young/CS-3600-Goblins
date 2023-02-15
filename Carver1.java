@@ -8,10 +8,10 @@ class Carver implements Runnable {
 	// Data is sent here to be carved out
 
 	int byteRead;
-	private InputStream inputStream;
-	private OutputStream outputStream;
+	private BufferedInputStream inputStream;
+	private BufferedOutputStream outputStream;
 
-	Carver(InputStream inputStream, OutputStream outputStream) {
+	Carver(BufferedInputStream inputStream, BufferedOutputStream outputStream) {
 		//jpeg carver function assumes you are pointing at the beginning of a jpeg right after
    		//the header
     		this.inputStream = inputStream;
@@ -59,9 +59,11 @@ public class Carver1 {
         String inputFile = "test1.dd";
         String outputFile;
 		Thread[] threads = new Thread[10];
+		boolean carving = false; // Toggle for thread creation
  
         try (
-            InputStream inputStream = new FileInputStream(inputFile);
+            InputStream is = new FileInputStream(inputFile);
+			BufferedInputStream inputStream = new BufferedInputStream(is);
         ) {
  
  			//input stream returns bytes in the form of integer values
@@ -79,9 +81,10 @@ public class Carver1 {
 				
             	int tCount = 0; // Counts how many threads are in use.
 				outputFile = "Out" + tCount + ".jpg"; // dynamic name based on thread count for the outputted file
-				OutputStream outputStream = new FileOutputStream(outputFile); // Set the output stream based off the new file name
+				OutputStream os = new FileOutputStream(outputFile); // Set the output stream based off the new file name
+				BufferedOutputStream outputStream = new BufferedOutputStream(os);
 
-            	if (byteRead == 255)//Start of header
+            	if (byteRead == 255 && !carving)//Start of header
               	  {
               	  		inputStream.mark(4);//mark the current position
               	  		
@@ -92,13 +95,24 @@ public class Carver1 {
               	  	
               	  	//if next 3 bytes are a match call carving method
               	  	if (byte2 == 216 && byte3==255 && byte4 == 224) {
+
 					// Create a new thread to carve and add it to the array.
               	  		// {carveJpeg(inputStream, outputStream);}
 						if (tCount < threads.length)
 							expandArray(threads);
 						threads[tCount] = new Thread(new Carver(inputStream, outputStream));
-					}
-              	  	else
+						carving = true;
+
+					} else if (carving) {
+						//write loop until you find the footer ff d9 -> 255 217
+						//if you find an ff look for a d9
+						if (byteRead == 255) {
+							byteRead = inputStream.read();
+								if(byteRead == 217) {
+									carving = false; // hit the end of carving
+								}
+						}
+					} else
               	  		inputStream.reset(); //if it isn't a match reset to mark
               	  }
             }
