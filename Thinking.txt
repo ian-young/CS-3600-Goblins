@@ -5,6 +5,6 @@ searching for a ffd9 for the ending of a file -> when the ending is found, it sw
 
 This should be running in N since all threads are using a single for loop
 
-The threads should be spawned and stored inside of an array (size 20?)
-The threads do not need to be syncronized since they output to a file
-File name increments by 1 (use variable i for file name?)
+- The threads should be spawned and stored inside of an array (size 20?)
+- The threads do not need to be syncronized since they output to a file
+- File name increments by 1 (use variable i for file name?)
