@@ -6,8 +6,6 @@ import java.io.OutputStream;
 import java.io.IOException;
 
 public class Carver1 {
-    private static final int BUFFER_SIZE = 4096;
-
     public static void main(String[] args) {
         //hard coded test set
         String inputFile = "test1.dd";
