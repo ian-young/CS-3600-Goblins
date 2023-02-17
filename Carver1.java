@@ -81,7 +81,6 @@ public class Carver1 {
             	if (byteRead == 255)//Start of header
               	  {
               	  		inputStream.mark(4);//mark the current position
-              	  		
               	  		//read in the next 3 bytes for header check
               	  		byte2 = inputStream.read();
               	  		byte3 = inputStream.read();
