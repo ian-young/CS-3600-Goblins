@@ -1,8 +1,5 @@
 //Binary carver for jpegs
-//Proof of concept for 3600 lab assignment
-//1-17-19
-//Edited 2-9-20
-//-Dr. G
+//Ian Young
 
 import java.io.*;
  
