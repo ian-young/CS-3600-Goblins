@@ -1,69 +1,71 @@
-//Multi-threaded Binary carver for jpegs
-//Edited 2-13-23
-//-Ian Young
+//Binary carver for jpegs
+//Proof of concept for 3600 lab assignment
+//1-17-19
+//Edited 2-9-20
+//-Dr. G
 
 import java.io.*;
-
-class Carver implements Runnable {
-	// Data is sent here to be carved out
-
-	int byteRead;
-	private BufferedInputStream inputStream;
-	private BufferedOutputStream outputStream;
-
-	Carver(BufferedInputStream inputStream, BufferedOutputStream outputStream) {
-		//jpeg carver function assumes you are pointing at the beginning of a jpeg right after
-   		//the header
-    		this.inputStream = inputStream;
-			this.outputStream = outputStream;				
-	}
-
-	public void run() {
-		try {
-			//write the header
-			outputStream.write(255);
-			outputStream.write(216);
-			outputStream.write(255);
-			outputStream.write(224);
-			
-			//write loop until you find the footer ff d9 -> 255 217
-			while ((byteRead = inputStream.read()) != -1) 
-			{
-				outputStream.write(byteRead);
-				
-				//if you find an ff look for a d9
-				if (byteRead == 255)
-					{
-						byteRead = inputStream.read();
-						outputStream.write(byteRead);
-						
-							if(byteRead == 217)
-								{
-									outputStream.write(byteRead);
-									break; //this is the end
-								}
-					}
-			}//end while
-		}//end try
-		catch (IOException ex) {
-			ex.printStackTrace();
-		}
-	}
-
-}
  
+//jpeg carver function assumes you are pointing at the beginning of a jpeg right after
+   //the header
+   class carveJpeg implements Runnable {
+		private InputStream inputStream;
+		private OutputStream outputStream;
+
+		carveJpeg (InputStream inputStream, OutputStream outputStream) {
+			this.inputStream = inputStream;
+			this.outputStream = outputStream;
+		}
+    				
+				@Override
+				public void run() {
+					int byteRead;
+    				
+    		try {
+    				//write the header
+    				outputStream.write(255);
+    				outputStream.write(216);
+    				outputStream.write(255);
+    				outputStream.write(224);
+    				
+    				//write loop until you find the footer ff d9 -> 255 217
+    				while ((byteRead = inputStream.read()) != -1) 
+    				{
+    					outputStream.write(byteRead);
+    					
+    					//if you find an ff look for a d9
+    					if (byteRead == 255)
+    						{
+    							byteRead = inputStream.read();
+    							outputStream.write(byteRead);
+    							
+    								if(byteRead == 217)
+    									{
+    										outputStream.write(byteRead);
+    										break; //this is the end
+    									}
+    						}
+    				}//end while
+    			}//end try
+    			catch (IOException ex) {
+					ex.printStackTrace();
+				}
+				}
+    	}
+
 public class Carver1 {
     public static void main(String[] args) {
        
+		// Counts how many files have been carved
+		int count = 0;
+
        //hard coded test set
         String inputFile = "test1.dd";
-        String outputFile;
-		Thread[] threads = new Thread[10];
-		boolean carving = false; // Toggle for thread creation
+        String outputFile = "file" + count + ".jpg";
  
         try (
-            InputStream is = new FileInputStream(inputFile);
-			BufferedInputStream inputStream = new BufferedInputStream(is);
+            InputStream inputStream = new FileInputStream(inputFile);
+            OutputStream outputStream = new FileOutputStream(outputFile);
         ) {
  
  			//input stream returns bytes in the form of integer values
@@ -78,13 +80,8 @@ public class Carver1 {
  			//The decimal equivalent is 255 216 255 224
  			
             while ((byteRead = inputStream.read()) != -1) {
-				
-            	int tCount = 0; // Counts how many threads are in use.
-				outputFile = "Out" + tCount + ".jpg"; // dynamic name based on thread count for the outputted file
-				OutputStream os = new FileOutputStream(outputFile); // Set the output stream based off the new file name
-				BufferedOutputStream outputStream = new BufferedOutputStream(os);
-
-            	if (byteRead == 255 && !carving)//Start of header
+            	
+            	if (byteRead == 255)//Start of header
               	  {
               	  		inputStream.mark(4);//mark the current position
               	  		
@@ -95,24 +92,11 @@ public class Carver1 {
               	  	
               	  	//if next 3 bytes are a match call carving method
               	  	if (byte2 == 216 && byte3==255 && byte4 == 224) {
-
-					// Create a new thread to carve and add it to the array.
-              	  		// {carveJpeg(inputStream, outputStream);}
-						if (tCount < threads.length)
-							expandArray(threads);
-						threads[tCount] = new Thread(new Carver(inputStream, outputStream));
-						carving = true;
-
-					} else if (carving) {
-						//write loop until you find the footer ff d9 -> 255 217
-						//if you find an ff look for a d9
-						if (byteRead == 255) {
-							byteRead = inputStream.read();
-								if(byteRead == 217) {
-									carving = false; // hit the end of carving
-								}
-						}
-					} else
+              	  		// carveJpeg(inputStream, outputStream);
+						Thread test = new Thread(new carveJpeg(inputStream, outputStream));
+						test.start();
+					}
+              	  	else
               	  		inputStream.reset(); //if it isn't a match reset to mark
               	  }
             }
@@ -121,15 +105,5 @@ public class Carver1 {
             ex.printStackTrace();
         }
     }
-
-	public static Thread[] expandArray(Thread[] threads){
-		// Doubles the size of an array
-
-		Thread[] doubledArray = new Thread[threads.length * 2];
-		for (int i = 0;i < threads.length; i++) {
-			doubledArray[i] = threads[i];
-		}
-		return doubledArray;
-	}
-
+    
 }
