@@ -112,5 +112,6 @@ public class Carver1 {
 				}
 			}
 		}//end while
+		outputStream.close();
 	}
 }
