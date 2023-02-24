@@ -1,3 +1,11 @@
+/* Painstakingly made by:
+ * Ian Young 2/23/2023
+ *  The purpose of this program is to carve jpg files from a data dump file (.dd)
+ * This will NOT read EXIF files. This divides the input file into chunks which
+ * are to be read by threads. These threads will call the method "carveJpeg"
+ * when a matching jpg header is found. From there, the file is carved and
+ * outputted to a .jpg file. ENJOY!
+*/
 import java.io.BufferedInputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -10,7 +18,7 @@ import java.io.File;
 public class Carver1 {
     public static void main(String[] args) {
         //hard coded test set
-        String inputFile = "test1.dd"; // File to carve
+        String inputFile = "GoblinsV2.dd"; // File to carve
         File huntingGround = new File(inputFile);
         
         long packSize = huntingGround.length(); // Length of the file
@@ -30,10 +38,6 @@ public class Carver1 {
             threads[i] = new Thread(seek[i]);
             threads[i].start();
             System.out.println(seek[i].getID() + " has joined the hunt!");
-        }
-
-        for (Thread thread : threads) {
-            thread.join();
         }
 
         // Jpegs start with ff d8 ff e0
@@ -116,13 +120,37 @@ public class Carver1 {
                 inputStream.skip(begin); // Starts reading at thread's starting pos
 
                 // While loop will stop at the end of the stream or at the end of the chunk given
-                while((byteRead = inputStream.read()) !+ -1 && position < packSize / numThread) {
+                while((byteRead = inputStream.read()) != -1 && position < packSize / numThread) {
                     position++; // Advance!!!!
+                    if (byteRead == 255)// Start of header
+					{
+						inputStream.mark(4);// mark the current position
 
-                    // Finish out...
-                }
-            }
+						// Read in the next 3 bytes for header check
+						byte2 = inputStream.read();
+						byte3 = inputStream.read();
+						byte4 = inputStream.read();
+
+						// If jpg header is found, pass to carver
+                        // This avoids overlap carving which is the issue I was facing
+						if (byte2 == 216 && byte3 == 255 && byte4 == 224) {
+							OutputStream outputStream = new FileOutputStream("Thread" + id + ".Gob" + headCount + ".jpg"); // Unique file output creation
+							headCount++; //update file count
+							System.out.println(id+" spotted it's " + headCount + " goblin!");
+							position =+ carveJpeg(inputStream, outputStream); //carve and update position
+							System.out.println(id+" identified it's " + headCount + " goblin!");
+						} else
+							inputStream.reset(); // If it isn't a match, try again
+					}
+				}
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				System.err.println("Uhhhh....");
+			}
         }
 
+        public int getID() {
+            return id;
+        }
     }
 }
