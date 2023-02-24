@@ -1,115 +1,128 @@
 import java.io.BufferedInputStream;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.IOException;
+import java.io.File;
 
 public class Carver1 {
     public static void main(String[] args) {
         //hard coded test set
-        String inputFile = "test1.dd";
-        String outputFile = "file1.jpg";
+        String inputFile = "test1.dd"; // File to carve
+        File huntingGround = new File(inputFile);
+        
+        long packSize = huntingGround.length(); // Length of the file
+        int numThreads = Runtime.getRuntime().availableProcessors(); // Threads available to play
+        long[] chunkSize = new long[numThreads]; // Chunk size for each thread to look at
 
-        try (
-            InputStream inputStream = new BufferedInputStream(new FileInputStream(inputFile));
-            OutputStream outputStream = new FileOutputStream(outputFile);
-        ) {
-            int fileSize = inputStream.available();
+        for(int i = 0; i < numThreads; i++)
+        // Create starting positions for each thread
+            chunkSize[i] = packSize * i / numThreads;
 
-            int numThreads = Runtime.getRuntime().availableProcessors();
-            int chunkSize = fileSize / numThreads;
+            Scout[] seek = new Scout[numThreads];
+            for(int i = 0;i < numThreads;i++)
+                seek[i] = new Scout(chunkSize[i], inputFile, packSize, i, numThreads);
 
-            Thread[] threads = new Thread[numThreads];
-
-            for (int i = 0; i < numThreads; i++) {
-                int start = i * chunkSize;
-                int end = (i == numThreads - 1) ? fileSize : start + chunkSize;
-
-                threads[i] = new Thread(() -> {
-                    try {
-                        carveJpgs(inputStream, outputStream, start, end);
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                    }
-                });
-
-                threads[i].start();
-            }
-
-            for (Thread thread : threads) {
-                thread.join();
-            }
-        } catch (IOException | InterruptedException ex) {
-            ex.printStackTrace();
+        Thread[] threads = new Thread[numThreads];
+        for (int i = 0; i < numThreads; i++) {
+            threads[i] = new Thread(seek[i]);
+            threads[i].start();
+            System.out.println(seek[i].getID() + " has joined the hunt!");
         }
-    }
 
-    public static void carveJpgs(InputStream inputStream, OutputStream outputStream, int start, int end) throws IOException {
-        inputStream.skip(start);
-
-        //input stream returns bytes in the form of integer values
-        int byteRead;
-        int byte2;
-        int byte3;
-        int byte4;
-
-        //Jpegs start with ff d8 ff e0
-        //Some jpegs could end in e#
-        //If a jpeg has extended file header information (EXIF) it will have two ff d8 ff e#'s
-        //The decimal equivalent is 255 216 255 224
-        while (((BufferedInputStream)inputStream).read() < end && (byteRead = ((BufferedInputStream)inputStream).read()) != -1) {
-            if (byteRead == 255)//Start of header
-            {
-                inputStream.mark(4);//mark the current position
-
-                //read in the next 3 bytes for header check
-                byte2 = ((BufferedInputStream)inputStream).read();
-                byte3 = ((BufferedInputStream)inputStream).read();
-                byte4 = ((BufferedInputStream)inputStream).read();
-
-                //if next 3 bytes are a match call carving method
-                if (byte2 == 216 && byte3==255 && byte4 == 224)
-                {
-                    carveJpeg(inputStream, outputStream);
-                }
-                else
-                {
-                    ((BufferedInputStream)inputStream).reset(); //if it isn't a match reset to mark
-                }
-            }
+        for (Thread thread : threads) {
+            thread.join();
         }
+
+        // Jpegs start with ff d8 ff e0
+		// Some jpegs could end in e#
+		// If a jpeg has extended file header information (EXIF) it will have two ff d8
+		// ff e#'s
+		// The decimal equivalent is 255 216 255 224
     }
 
     //jpeg carver function assumes you are pointing at the beginning of a jpeg right after
     //the header
-    public static void carveJpeg(InputStream inputStream, OutputStream outputStream) throws IOException {
-        int byteRead;
+    public static int carveJpeg(InputStream inputStream, OutputStream outputStream) {
+		int byteRead;
+		int count = 0;
+		try {
+			// write the header
+			outputStream.write(255);
+			outputStream.write(216);
+			outputStream.write(255);
+			outputStream.write(224);
 
-        //write the header
-        outputStream.write(255);
-        outputStream.write(216);
-        outputStream.write(255);
-        outputStream.write(224);
+			// write loop until you find the footer ff d9 -> 255 217
+			while ((byteRead = inputStream.read()) != -1) {
+				outputStream.write(byteRead);
+				count++;
 
-        //write loop until you find the footer ff d9 -> 255 217
-        while ((byteRead = ((BufferedInputStream)inputStream).read()) != -1)
-        {
-            outputStream.write(byteRead);
+				// if you find an ff look for a d9
+				if (byteRead == 255) {
+					byteRead = inputStream.read();
+					count++;
+					outputStream.write(byteRead);
 
-            //if you find an ff look for a d9
-            if (byteRead == 255)
-            {
-                byteRead = ((BufferedInputStream)inputStream).read();
-                outputStream.write(byteRead);
-
-                if(byteRead == 217)
-                {
-                    outputStream.write(byteRead);
-                    break; //this is the end
+					if (byteRead == 217) {
+						outputStream.write(byteRead);
+						break; // this is the end
+					}
 				}
-			}
-		}//end while
-		outputStream.close();
+			} // end while
+		} // end try
+		catch (IOException ex) {
+			ex.printStackTrace();
+		}
+		return count;
 	}
+
+    static class Scout implements Runnable {
+        // Initialize variables to be used in this class
+        private long begin; // Starting position for the thread
+        private InputStream inputStream;
+        private long position; // Track the position -> avoids reading twice
+        private long packSize;
+        private int id;
+        private int numThread;
+        
+        public static int headCount = 0; // Tracks how many goblins have been found
+
+        public Scout(long begin, String inputFile, long packSize,int id, int numThread) {
+            InputStream inputStream;
+            try {
+                this.begin = begin;
+                inputStream = new FileInputStream(inputFile);
+                this.inputStream = new BufferedInputStream(inputStream);
+                this.packSize = packSize;
+                this.id = id;
+                this.numThread = numThread;
+        } catch (FileNotFoundException e) {
+            // TODO Auto-generated catch block
+            System.err.println("Non-existant file passed through.");
+        }
+        }
+        @Override
+        public void run() {
+            // TODO Auto-generated method stub
+            int byteRead;
+            int byte2;
+            int byte3;
+            int byte4;
+
+            try {
+                inputStream.skip(begin); // Starts reading at thread's starting pos
+
+                // While loop will stop at the end of the stream or at the end of the chunk given
+                while((byteRead = inputStream.read()) !+ -1 && position < packSize / numThread) {
+                    position++; // Advance!!!!
+
+                    // Finish out...
+                }
+            }
+        }
+
+    }
 }
